@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Taiga Extension pour VS Code
 
 Extension VS Code pour gérer vos projets Taiga directement depuis votre éditeur.
@@ -47,4 +46,3 @@ MIT
 =======
 # taiga-extension
 An unofficial vscode extension for Taiga.sh
->>>>>>> edc3c874364eb19d2dd16ef00ee30cb23202cb71
