@@ -1,15 +1,20 @@
-# Taiga Extension pour VS Code
+# 🦣 Mamouth pour Taiga
 
-Extension VS Code pour gérer vos projets Taiga directement depuis votre éditeur.
+Extension VS Code pour gérer vos projets Taiga avec la puissance d'un mammouth !
+
+## Pourquoi Mamouth ?
+
+Parce que gérer des projets, ça demande de la **force**, de la **mémoire** et de la **robustesse** - exactement comme un mammouth ! 🦣
 
 ## Fonctionnalités
 
 - 🔐 Connexion sécurisée à votre instance Taiga
-- 📁 Navigation dans vos projets
+- 📁 Navigation dans vos projets avec la puissance d'un mammouth
 - 🏃 Gestion des sprints
 - 📝 Visualisation des user stories avec statut et assignation
 - ✅ Suivi des tâches
 - 🔗 Ouverture directe dans Taiga
+- 🦣 Interface mammouth-friendly
 
 ## Installation
 

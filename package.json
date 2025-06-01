@@ -1,7 +1,7 @@
 {
-    "name": "taiga-extension",
-    "displayName": "Taiga Project Manager",
-    "description": "Extension VS Code pour gérer vos projets Taiga",
+    "name": "mamouth-taiga",
+    "displayName": "Mamouth pour Taiga",
+    "description": "Extension VS Code pour gérer vos projets Taiga avec la puissance d'un mammouth",
     "version": "0.0.1",
     "publisher": "matthieulabaune",
     "engines": {
@@ -12,17 +12,17 @@
     ],
     "activationEvents": [],
     "main": "./src/extension.js",
-    "icon": "images/icon.svg",
+    "icon": "images/mamouth-icon.svg",
     "galleryBanner": {
-        "color": "#2c3e50",
+        "color": "#8B4513",
         "theme": "dark"
     },
     "contributes": {
         "views": {
-            "taigaView": [
+            "mamouthView": [
                 {
                     "id": "taigaExplorer",
-                    "name": "Projets",
+                    "name": "Projets Taiga",
                     "when": "true"
                 }
             ]
@@ -30,9 +30,9 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "taigaView",
-                    "title": "Taiga",
-                    "icon": "$(project)"
+                    "id": "mamouthView",
+                    "title": "Mamouth pour Taiga",
+                    "icon": "images/mamouth-activity-icon.svg"
                 }
             ]
         },
