@@ -21,8 +21,28 @@
         "views": {
             "mamouthView": [
                 {
-                    "id": "taigaExplorer",
-                    "name": "Projets Taiga",
+                    "id": "taigaProjects",
+                    "name": "PROJETS",
+                    "when": "true"
+                },
+                {
+                    "id": "taigaSearch",
+                    "name": "RECHERCHE",
+                    "when": "true"
+                },
+                {
+                    "id": "taigaEpics",
+                    "name": "EPICS",
+                    "when": "true"
+                },
+                {
+                    "id": "taigaSprints",
+                    "name": "SPRINTS",
+                    "when": "true"
+                },
+                {
+                    "id": "taigaUserStories",
+                    "name": "USER STORIES",
                     "when": "true"
                 }
             ]
@@ -86,60 +106,70 @@
                 "command": "taiga.clearSearch",
                 "title": "Effacer la recherche",
                 "icon": "$(clear-all)"
+            },
+            {
+                "command": "taiga.selectProject",
+                "title": "Sélectionner ce projet",
+                "icon": "$(arrow-right)"
             }
         ],
         "menus": {
             "view/title": [
                 {
                     "command": "taiga.search",
-                    "when": "view == taigaExplorer",
+                    "when": "view == taigaSearch",
                     "group": "navigation@1"
                 },
                 {
                     "command": "taiga.clearSearch",
-                    "when": "view == taigaExplorer",
+                    "when": "view == taigaSearch",
                     "group": "navigation@2"
                 },
                 {
                     "command": "taiga.login",
-                    "when": "view == taigaExplorer",
-                    "group": "navigation@3"
+                    "when": "view == taigaProjects",
+                    "group": "navigation@1"
                 },
                 {
                     "command": "taiga.refresh",
-                    "when": "view == taigaExplorer",
-                    "group": "navigation@4"
+                    "when": "view == taigaProjects",
+                    "group": "navigation@2"
                 },
                 {
                     "command": "taiga.logout",
-                    "when": "view == taigaExplorer",
-                    "group": "navigation@5"
+                    "when": "view == taigaProjects",
+                    "group": "navigation@3"
                 }
             ],
             "view/item/context": [
                 {
+                    "command": "taiga.selectProject",
+                    "when": "view == taigaProjects && viewItem == project",
+                    "group": "inline@1"
+                },
+                {
                     "command": "taiga.openProject",
-                    "when": "view == taigaExplorer && viewItem == project",
-                    "group": "inline"
+                    "when": "(view == taigaProjects || view == taigaSearch || view == taigaEpics || view == taigaSprints || view == taigaUserStories) && viewItem == project",
+                    "group": "inline@2"
                 },
                 {
                     "command": "taiga.openUserStory",
-                    "when": "view == taigaExplorer && viewItem == userstory",
+                    "when": "(view == taigaProjects || view == taigaSearch || view == taigaEpics || view == taigaSprints || view == taigaUserStories) && viewItem == userstory",
                     "group": "inline"
                 },
                 {
                     "command": "taiga.openTask",
-                    "when": "view == taigaExplorer && viewItem == task",
+                    "when": "(view == taigaProjects || view == taigaSearch || view == taigaEpics || view == taigaSprints || view == taigaUserStories) && viewItem == task",
                     "group": "inline"
                 },
                 {
                     "command": "taiga.openMilestone",
-                    "when": "view == taigaExplorer && viewItem == milestone",
+                    "when": "(view == taigaProjects || view == taigaSearch || view == taigaEpics || view == taigaSprints || view == taigaUserStories) && viewItem == milestone",
                     "group": "inline"
                 },
                 {
                     "command": "taiga.openEpic",
-                    "when": "view == taigaExplorer && viewItem == epic",
+                    "when": "(view == taigaProjects || view == taigaSearch || view == taigaEpics || view == taigaSprints || view == taigaUserStories) && viewItem == epic",
                     "group": "inline"
                 }
             ]

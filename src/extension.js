@@ -5,15 +5,15 @@ const vscode = require('vscode');
 
 // TreeDataProvider enrichi pour afficher projets, milestones, user stories et tâches
 class TaigaTreeDataProvider {
-    constructor(context) {
+    constructor(context, viewType = 'projects') {
         this.context = context;
+        this.viewType = viewType;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
-        // AJOUT UNIQUEMENT :
         this.searchQuery = '';
+        this.selectedProjectId = null;
     }
 
-    // AJOUT UNIQUEMENT - 3 méthodes :
     setSearchQuery(query) {
         this.searchQuery = query.toLowerCase().trim();
         this.refresh();
@@ -38,6 +38,11 @@ class TaigaTreeDataProvider {
         return element;
     }
 
+    setSelectedProject(projectId) {
+        this.selectedProjectId = projectId;
+        this.refresh();
+    }
+
     async getChildren(element) {
         const token = this.context.globalState.get('taiga_auth_token');
 
@@ -46,23 +51,21 @@ class TaigaTreeDataProvider {
         }
 
         if (!element) {
-            // Niveau racine - afficher les projets
-            return await this.getProjects();
-        } else if (element.contextValue === 'project') {
-            // Niveau projet - afficher sprints et user stories
-            return await this.getProjectChildren(element.data);
-        } else if (element.contextValue === 'sprints-section') {
-            // Section sprints - afficher tous les sprints
-            return await this.getProjectSprints(element.projectId);
-        } else if (element.contextValue === 'milestone') {
-            // Niveau sprint - afficher les user stories du sprint
-            return await this.getMilestoneUserStories(element.data);
-        } else if (element.contextValue === 'userstories-section') {
-            // Section user stories - afficher toutes les user stories
-            return await this.getProjectUserStories(element.projectId);
-        } else if (element.contextValue === 'userstory') {
-            // Niveau user story - afficher les tâches
-            return await this.getUserStoryTasks(element.data);
+            // Afficher selon le type de vue
+            switch (this.viewType) {
+                case 'projects':
+                    return await this.getProjects();
+                case 'search':
+                    return await this.getSearchResults();
+                case 'epics':
+                    return await this.getEpicsForCurrentProject();
+                case 'sprints':
+                    return await this.getSprintsForCurrentProject();
+                case 'userstories':
+                    return await this.getUserStoriesForCurrentProject();
+                default:
+                    return [];
+            }
         }
 
         return [];
@@ -75,7 +78,7 @@ class TaigaTreeDataProvider {
         }
 
         return projects.map(project => {
-            const item = new vscode.TreeItem(project.name, vscode.TreeItemCollapsibleState.Collapsed);
+            const item = new vscode.TreeItem(project.name, vscode.TreeItemCollapsibleState.None);
             item.tooltip = `${project.name}\n${project.description || 'Pas de description'}`;
             item.contextValue = 'project';
             item.iconPath = new vscode.ThemeIcon('project');
@@ -84,71 +87,113 @@ class TaigaTreeDataProvider {
         });
     }
 
-    async getProjectChildren(project) {
-        const children = [];
-
-        // Section Sprints (Milestones)
-        const sprintsItem = new vscode.TreeItem('Sprints', vscode.TreeItemCollapsibleState.Collapsed);
-        sprintsItem.contextValue = 'sprints-section';
-        sprintsItem.projectId = project.id;
-        sprintsItem.iconPath = new vscode.ThemeIcon('clock');
-        children.push(sprintsItem);
-
-        // Section User Stories
-        const userStoriesItem = new vscode.TreeItem('User Stories', vscode.TreeItemCollapsibleState.Collapsed);
-        userStoriesItem.contextValue = 'userstories-section';
-        userStoriesItem.projectId = project.id;
-        userStoriesItem.iconPath = new vscode.ThemeIcon('list-unordered');
-        children.push(userStoriesItem);
-
-        // Charger les sprints et compter
-        try {
-            const milestones = await this.loadMilestones(project.id);
-            if (milestones.length > 0) {
-                sprintsItem.description = `(${milestones.length})`;
-            }
-        } catch (error) {
-            console.error('Erreur chargement sprints:', error);
+    async getSearchResults() {
+        if (!this.searchQuery) {
+            return [this.createInfoItem('Utilisez la barre de recherche pour chercher')];
+        }
+        if (!this.selectedProjectId) {
+            return [this.createInfoItem('Sélectionnez d\'abord un projet')];
         }
 
-        return children;
+        // Implémenter la recherche ici
+        return [this.createInfoItem(`Recherche: "${this.searchQuery}" dans projet ${this.selectedProjectId}`)];
     }
 
-    async getProjectSprints(projectId) {
+    async getEpicsForCurrentProject() {
+        if (!this.selectedProjectId) {
+            return [this.createInfoItem('Sélectionnez d\'abord un projet')];
+        }
+
         try {
-            const milestones = await this.loadMilestones(projectId);
-            if (milestones.length === 0) {
-                return [this.createInfoItem('Aucun sprint trouvé')];
+            const epics = await this.loadEpics(this.selectedProjectId);
+            const filtered = epics.filter(epic => this.matchesSearch(epic));
+
+            if (filtered.length === 0) {
+                return [this.createInfoItem('Aucun epic trouvé')];
             }
 
-            return milestones.map(milestone => {
-                const item = new vscode.TreeItem(
-                    milestone.name,
-                    vscode.TreeItemCollapsibleState.Collapsed
-                );
-
-                const startDate = milestone.estimated_start ? new Date(milestone.estimated_start).toLocaleDateString() : 'N/A';
-                const endDate = milestone.estimated_finish ? new Date(milestone.estimated_finish).toLocaleDateString() : 'N/A';
-
-                item.tooltip = `Sprint: ${milestone.name}\nDébut: ${startDate}\nFin: ${endDate}\nStatut: ${milestone.closed ? 'Fermé' : 'Actif'}`;
-                item.contextValue = 'milestone';
-                item.data = milestone;
-                item.iconPath = new vscode.ThemeIcon(milestone.closed ? 'check' : 'clock');
-
-                // Ajouter la description avec les dates
-                if (milestone.estimated_start || milestone.estimated_finish) {
-                    item.description = `${startDate} → ${endDate}`;
-                }
-
+            return filtered.map(epic => {
+                const item = new vscode.TreeItem(`#${epic.ref} ${epic.subject}`, vscode.TreeItemCollapsibleState.None);
+                item.tooltip = `Epic #${epic.ref}: ${epic.subject}`;
+                item.contextValue = 'epic';
+                item.data = epic;
+                item.iconPath = new vscode.ThemeIcon(epic.is_closed ? 'check' : 'bookmark');
                 return item;
             });
         } catch (error) {
-            console.error('Erreur chargement sprints:', error);
+            return [this.createInfoItem('Erreur lors du chargement des epics')];
+        }
+    }
+
+    async getSprintsForCurrentProject() {
+        if (!this.selectedProjectId) {
+            return [this.createInfoItem('Sélectionnez d\'abord un projet')];
+        }
+
+        try {
+            const sprints = await this.loadSprints(this.selectedProjectId);
+            const filtered = sprints.filter(sprint => this.matchesSearch(sprint));
+
+            if (filtered.length === 0) {
+                return [this.createInfoItem('Aucun sprint trouvé')];
+            }
+
+            return filtered.map(sprint => {
+                const item = new vscode.TreeItem(sprint.name, vscode.TreeItemCollapsibleState.None);
+                item.tooltip = `Sprint: ${sprint.name}`;
+                item.contextValue = 'milestone';
+                item.data = sprint;
+                item.iconPath = new vscode.ThemeIcon(sprint.closed ? 'check' : 'clock');
+                return item;
+            });
+        } catch (error) {
             return [this.createInfoItem('Erreur lors du chargement des sprints')];
         }
     }
 
-    async loadMilestones(projectId) {
+    async getUserStoriesForCurrentProject() {
+        if (!this.selectedProjectId) {
+            return [this.createInfoItem('Sélectionnez d\'abord un projet')];
+        }
+
+        try {
+            const userStories = await this.loadUserStories(this.selectedProjectId);
+            const filtered = userStories.filter(us => this.matchesSearch(us));
+
+            if (filtered.length === 0) {
+                return [this.createInfoItem('Aucune user story trouvée')];
+            }
+
+            return filtered.map(us => {
+                const item = new vscode.TreeItem(`#${us.ref} ${us.subject}`, vscode.TreeItemCollapsibleState.None);
+                item.tooltip = `User Story #${us.ref}: ${us.subject}`;
+                item.contextValue = 'userstory';
+                item.data = us;
+                item.iconPath = new vscode.ThemeIcon(us.is_closed ? 'check' : 'circle-outline');
+                return item;
+            });
+        } catch (error) {
+            return [this.createInfoItem('Erreur lors du chargement des user stories')];
+        }
+    }
+
+    async loadEpics(projectId) {
+        const token = this.context.globalState.get('taiga_auth_token');
+        const config = vscode.workspace.getConfiguration('taiga');
+        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
+
+        try {
+            const response = await axios.get(`${baseUrl}/api/v1/epics?project=${projectId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Erreur API epics:', error);
+            return [];
+        }
+    }
+
+    async loadSprints(projectId) {
         const token = this.context.globalState.get('taiga_auth_token');
         const config = vscode.workspace.getConfiguration('taiga');
         const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
@@ -159,23 +204,18 @@ class TaigaTreeDataProvider {
             });
             return response.data;
         } catch (error) {
-            console.error('Erreur API milestones:', error);
+            console.error('Erreur API sprints:', error);
             return [];
         }
     }
 
-    async loadUserStories(projectId, milestoneId = null) {
+    async loadUserStories(projectId) {
         const token = this.context.globalState.get('taiga_auth_token');
         const config = vscode.workspace.getConfiguration('taiga');
         const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
 
         try {
-            let url = `${baseUrl}/api/v1/userstories?project=${projectId}`;
-            if (milestoneId) {
-                url += `&milestone=${milestoneId}`;
-            }
-
-            const response = await axios.get(url, {
+            const response = await axios.get(`${baseUrl}/api/v1/userstories?project=${projectId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             return response.data;
@@ -183,309 +223,6 @@ class TaigaTreeDataProvider {
             console.error('Erreur API user stories:', error);
             return [];
         }
-    }
-
-    async loadTasks(userStoryId) {
-        const token = this.context.globalState.get('taiga_auth_token');
-        const config = vscode.workspace.getConfiguration('taiga');
-        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
-
-        try {
-            const response = await axios.get(`${baseUrl}/api/v1/tasks?user_story=${userStoryId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur API tasks:', error);
-            return [];
-        }
-    }
-
-    async getMilestoneUserStories(milestone) {
-        const userStories = await this.loadUserStories(milestone.project, milestone.id);
-        // AJOUT UNIQUEMENT cette ligne :
-        const filtered = userStories.filter(us => this.matchesSearch(us));
-        return filtered.map(us => this.createUserStoryItem(us));
-    }
-
-    async getProjectUserStories(projectId) {
-        const userStories = await this.loadUserStories(projectId);
-        // AJOUT UNIQUEMENT cette ligne :
-        const filtered = userStories.filter(us => this.matchesSearch(us));
-        return filtered.map(us => this.createUserStoryItem(us));
-    }
-
-    createUserStoryItem(userStory) {
-        // Construire le titre avec truncature si nécessaire
-        let title = `#${userStory.ref} ${userStory.subject}`;
-        if (title.length > 60) {
-            title = title.substring(0, 57) + '...';
-        }
-
-        const item = new vscode.TreeItem(
-            title,
-            vscode.TreeItemCollapsibleState.Collapsed
-        );
-
-        // Construire la description avec statut et assigné
-        let description = '';
-        if (userStory.status_extra_info?.name) {
-            description += `*(${userStory.status_extra_info.name})*`;
-        }
-        if (userStory.assigned_to_extra_info?.full_name_display) {
-            const assignee = userStory.assigned_to_extra_info.full_name_display;
-            const shortAssignee = assignee.length > 15 ? assignee.substring(0, 12) + '...' : assignee;
-            description += description ? ` - ${shortAssignee}` : shortAssignee;
-        }
-
-        item.description = description;
-        item.tooltip = `#${userStory.ref}: ${userStory.subject}\nStatut: ${userStory.status_extra_info?.name || 'N/A'}\nAssigné à: ${userStory.assigned_to_extra_info?.full_name_display || 'Non assigné'}`;
-        item.contextValue = 'userstory';
-        item.data = userStory;
-        item.iconPath = new vscode.ThemeIcon(userStory.is_closed ? 'check' : 'circle-outline');
-        return item;
-    }
-
-    async getUserStoryTasks(userStory) {
-        const tasks = await this.loadTasks(userStory.id);
-        const filtered = tasks.filter(task => this.matchesSearch(task));
-
-        if (filtered.length === 0) {
-            return [this.createInfoItem('Aucune tâche')];
-        }
-
-        return filtered.map(task => {
-            // Construire le titre avec truncature si nécessaire
-            let title = `#${task.ref} ${task.subject}`;
-            if (title.length > 60) {
-                title = title.substring(0, 57) + '...';
-            }
-
-            const item = new vscode.TreeItem(
-                title,
-                vscode.TreeItemCollapsibleState.None
-            );
-
-            // Construire la description avec statut et assigné
-            let description = '';
-            if (task.status_extra_info?.name) {
-                description += `*(${task.status_extra_info.name})*`;
-            }
-            if (task.assigned_to_extra_info?.full_name_display) {
-                const assignee = task.assigned_to_extra_info.full_name_display;
-                const shortAssignee = assignee.length > 15 ? assignee.substring(0, 12) + '...' : assignee;
-                description += description ? ` - ${shortAssignee}` : shortAssignee;
-            }
-
-            item.description = description;
-            item.tooltip = `#${task.ref}: ${task.subject}\nStatut: ${task.status_extra_info?.name || 'N/A'}\nAssigné à: ${task.assigned_to_extra_info?.full_name_display || 'Non assigné'}`;
-            item.contextValue = 'task';
-            item.data = task;
-            item.iconPath = new vscode.ThemeIcon(task.is_closed ? 'check' : 'circle-outline');
-            return item;
-        });
-    }
-
-    async getProjectChildren(project) {
-        const children = [];
-
-        // Section Sprints (Milestones)
-        const sprintsItem = new vscode.TreeItem('Sprints', vscode.TreeItemCollapsibleState.Collapsed);
-        sprintsItem.contextValue = 'sprints-section';
-        sprintsItem.projectId = project.id;
-        sprintsItem.iconPath = new vscode.ThemeIcon('clock');
-        children.push(sprintsItem);
-
-        // Section User Stories
-        const userStoriesItem = new vscode.TreeItem('User Stories', vscode.TreeItemCollapsibleState.Collapsed);
-        userStoriesItem.contextValue = 'userstories-section';
-        userStoriesItem.projectId = project.id;
-        userStoriesItem.iconPath = new vscode.ThemeIcon('list-unordered');
-        children.push(userStoriesItem);
-
-        // Charger les sprints et compter
-        try {
-            const milestones = await this.loadMilestones(project.id);
-            if (milestones.length > 0) {
-                sprintsItem.description = `(${milestones.length})`;
-            }
-        } catch (error) {
-            console.error('Erreur chargement sprints:', error);
-        }
-
-        return children;
-    }
-
-    async getProjectSprints(projectId) {
-        try {
-            const milestones = await this.loadMilestones(projectId);
-            if (milestones.length === 0) {
-                return [this.createInfoItem('Aucun sprint trouvé')];
-            }
-
-            return milestones.map(milestone => {
-                const item = new vscode.TreeItem(
-                    milestone.name,
-                    vscode.TreeItemCollapsibleState.Collapsed
-                );
-
-                const startDate = milestone.estimated_start ? new Date(milestone.estimated_start).toLocaleDateString() : 'N/A';
-                const endDate = milestone.estimated_finish ? new Date(milestone.estimated_finish).toLocaleDateString() : 'N/A';
-
-                item.tooltip = `Sprint: ${milestone.name}\nDébut: ${startDate}\nFin: ${endDate}\nStatut: ${milestone.closed ? 'Fermé' : 'Actif'}`;
-                item.contextValue = 'milestone';
-                item.data = milestone;
-                item.iconPath = new vscode.ThemeIcon(milestone.closed ? 'check' : 'clock');
-
-                // Ajouter la description avec les dates
-                if (milestone.estimated_start || milestone.estimated_finish) {
-                    item.description = `${startDate} → ${endDate}`;
-                }
-
-                return item;
-            });
-        } catch (error) {
-            console.error('Erreur chargement sprints:', error);
-            return [this.createInfoItem('Erreur lors du chargement des sprints')];
-        }
-    }
-
-    async loadMilestones(projectId) {
-        const token = this.context.globalState.get('taiga_auth_token');
-        const config = vscode.workspace.getConfiguration('taiga');
-        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
-
-        try {
-            const response = await axios.get(`${baseUrl}/api/v1/milestones?project=${projectId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur API milestones:', error);
-            return [];
-        }
-    }
-
-    async loadUserStories(projectId, milestoneId = null) {
-        const token = this.context.globalState.get('taiga_auth_token');
-        const config = vscode.workspace.getConfiguration('taiga');
-        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
-
-        try {
-            let url = `${baseUrl}/api/v1/userstories?project=${projectId}`;
-            if (milestoneId) {
-                url += `&milestone=${milestoneId}`;
-            }
-
-            const response = await axios.get(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur API user stories:', error);
-            return [];
-        }
-    }
-
-    async loadTasks(userStoryId) {
-        const token = this.context.globalState.get('taiga_auth_token');
-        const config = vscode.workspace.getConfiguration('taiga');
-        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
-
-        try {
-            const response = await axios.get(`${baseUrl}/api/v1/tasks?user_story=${userStoryId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur API tasks:', error);
-            return [];
-        }
-    }
-
-    async getMilestoneUserStories(milestone) {
-        const userStories = await this.loadUserStories(milestone.project, milestone.id);
-        // AJOUT UNIQUEMENT cette ligne :
-        const filtered = userStories.filter(us => this.matchesSearch(us));
-        return filtered.map(us => this.createUserStoryItem(us));
-    }
-
-    async getProjectUserStories(projectId) {
-        const userStories = await this.loadUserStories(projectId);
-        // AJOUT UNIQUEMENT cette ligne :
-        const filtered = userStories.filter(us => this.matchesSearch(us));
-        return filtered.map(us => this.createUserStoryItem(us));
-    }
-
-    createUserStoryItem(userStory) {
-        // Construire le titre avec truncature si nécessaire
-        let title = `#${userStory.ref} ${userStory.subject}`;
-        if (title.length > 60) {
-            title = title.substring(0, 57) + '...';
-        }
-
-        const item = new vscode.TreeItem(
-            title,
-            vscode.TreeItemCollapsibleState.Collapsed
-        );
-
-        // Construire la description avec statut et assigné
-        let description = '';
-        if (userStory.status_extra_info?.name) {
-            description += `*(${userStory.status_extra_info.name})*`;
-        }
-        if (userStory.assigned_to_extra_info?.full_name_display) {
-            const assignee = userStory.assigned_to_extra_info.full_name_display;
-            const shortAssignee = assignee.length > 15 ? assignee.substring(0, 12) + '...' : assignee;
-            description += description ? ` - ${shortAssignee}` : shortAssignee;
-        }
-
-        item.description = description;
-        item.tooltip = `#${userStory.ref}: ${userStory.subject}\nStatut: ${userStory.status_extra_info?.name || 'N/A'}\nAssigné à: ${userStory.assigned_to_extra_info?.full_name_display || 'Non assigné'}`;
-        item.contextValue = 'userstory';
-        item.data = userStory;
-        item.iconPath = new vscode.ThemeIcon(userStory.is_closed ? 'check' : 'circle-outline');
-        return item;
-    }
-
-    async getUserStoryTasks(userStory) {
-        const tasks = await this.loadTasks(userStory.id);
-        const filtered = tasks.filter(task => this.matchesSearch(task));
-
-        if (filtered.length === 0) {
-            return [this.createInfoItem('Aucune tâche')];
-        }
-
-        return filtered.map(task => {
-            // Construire le titre avec truncature si nécessaire
-            let title = `#${task.ref} ${task.subject}`;
-            if (title.length > 60) {
-                title = title.substring(0, 57) + '...';
-            }
-
-            const item = new vscode.TreeItem(
-                title,
-                vscode.TreeItemCollapsibleState.None
-            );
-
-            // Construire la description avec statut et assigné
-            let description = '';
-            if (task.status_extra_info?.name) {
-                description += `*(${task.status_extra_info.name})*`;
-            }
-            if (task.assigned_to_extra_info?.full_name_display) {
-                const assignee = task.assigned_to_extra_info.full_name_display;
-                const shortAssignee = assignee.length > 15 ? assignee.substring(0, 12) + '...' : assignee;
-                description += description ? ` - ${shortAssignee}` : shortAssignee;
-            }
-
-            item.description = description;
-            item.tooltip = `#${task.ref}: ${task.subject}\nStatut: ${task.status_extra_info?.name || 'N/A'}\nAssigné à: ${task.assigned_to_extra_info?.full_name_display || 'Non assigné'}`;
-            item.contextValue = 'task';
-            item.data = task;
-            item.iconPath = new vscode.ThemeIcon(task.is_closed ? 'check' : 'circle-outline');
-            return item;
-        });
     }
 
     createInfoItem(text) {
@@ -498,10 +235,36 @@ class TaigaTreeDataProvider {
 function activate(context) {
     console.log('Extension Taiga activée');
 
-    // Créer le TreeDataProvider
-    const treeDataProvider = new TaigaTreeDataProvider(context);
-    vscode.window.createTreeView('taigaExplorer', {
-        treeDataProvider: treeDataProvider,
+    // Créer les TreeDataProviders pour chaque vue
+    const projectsProvider = new TaigaTreeDataProvider(context, 'projects');
+    const searchProvider = new TaigaTreeDataProvider(context, 'search');
+    const epicsProvider = new TaigaTreeDataProvider(context, 'epics');
+    const sprintsProvider = new TaigaTreeDataProvider(context, 'sprints');
+    const userStoriesProvider = new TaigaTreeDataProvider(context, 'userstories');
+
+    // Créer les vues
+    vscode.window.createTreeView('taigaProjects', {
+        treeDataProvider: projectsProvider,
+        showCollapseAll: true
+    });
+
+    vscode.window.createTreeView('taigaSearch', {
+        treeDataProvider: searchProvider,
+        showCollapseAll: true
+    });
+
+    vscode.window.createTreeView('taigaEpics', {
+        treeDataProvider: epicsProvider,
+        showCollapseAll: true
+    });
+
+    vscode.window.createTreeView('taigaSprints', {
+        treeDataProvider: sprintsProvider,
+        showCollapseAll: true
+    });
+
+    vscode.window.createTreeView('taigaUserStories', {
+        treeDataProvider: userStoriesProvider,
         showCollapseAll: true
     });
 
@@ -555,7 +318,7 @@ function activate(context) {
                 );
 
                 // Charger les projets après connexion
-                await loadProjects(context, baseUrl, token, treeDataProvider);
+                await loadProjects(context, baseUrl, token, projectsProvider);
 
             } catch (err) {
                 console.error('Erreur de connexion:', err);
@@ -576,6 +339,21 @@ function activate(context) {
         });
     });
 
+    // Nouvelle commande pour sélectionner un projet
+    const selectProjectCommand = vscode.commands.registerCommand('taiga.selectProject', (item) => {
+        if (item && item.data && item.data.id) {
+            const projectId = item.data.id;
+
+            // Mettre à jour toutes les vues avec le projet sélectionné
+            searchProvider.setSelectedProject(projectId);
+            epicsProvider.setSelectedProject(projectId);
+            sprintsProvider.setSelectedProject(projectId);
+            userStoriesProvider.setSelectedProject(projectId);
+
+            vscode.window.showInformationMessage(`Projet sélectionné: ${item.data.name}`);
+        }
+    });
+
     const refreshCommand = vscode.commands.registerCommand('taiga.refresh', async () => {
         const token = context.globalState.get('taiga_auth_token');
         if (!token) {
@@ -586,7 +364,7 @@ function activate(context) {
         const config = vscode.workspace.getConfiguration('taiga');
         const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
 
-        await loadProjects(context, baseUrl, token, treeDataProvider);
+        await loadProjects(context, baseUrl, token, projectsProvider);
     });
 
     const logoutCommand = vscode.commands.registerCommand('taiga.logout', async () => {
@@ -594,7 +372,11 @@ function activate(context) {
         await context.globalState.update('taiga_user_info', undefined);
         await context.globalState.update('taiga_projects', []);
 
-        treeDataProvider.refresh();
+        projectsProvider.refresh();
+        searchProvider.refresh();
+        epicsProvider.refresh();
+        sprintsProvider.refresh();
+        userStoriesProvider.refresh();
         vscode.window.showInformationMessage('Déconnecté de Taiga');
     });
 
@@ -650,12 +432,18 @@ function activate(context) {
             placeHolder: '#42 ou titre...'
         });
         if (query !== undefined) {
-            treeDataProvider.setSearchQuery(query);
+            searchProvider.setSearchQuery(query);
+            epicsProvider.setSearchQuery(query);
+            sprintsProvider.setSearchQuery(query);
+            userStoriesProvider.setSearchQuery(query);
         }
     });
 
     const clearSearchCommand = vscode.commands.registerCommand('taiga.clearSearch', () => {
-        treeDataProvider.clearSearch();
+        searchProvider.clearSearch();
+        epicsProvider.clearSearch();
+        sprintsProvider.clearSearch();
+        userStoriesProvider.clearSearch();
     });
 
     context.subscriptions.push(
@@ -666,12 +454,23 @@ function activate(context) {
         openUserStoryCommand,
         openTaskCommand,
         openMilestoneCommand,
+        openEpicCommand,
         searchCommand,
-        clearSearchCommand
+        clearSearchCommand,
+        selectProjectCommand
     );
 }
 
-async function loadProjects(context, baseUrl, token, treeDataProvider) {
+function deactivate() {
+    console.log('Extension Taiga désactivée');
+}
+
+module.exports = {
+    activate,
+    deactivate
+};
+
+async function loadProjects(context, baseUrl, token, projectsProvider) {
     try {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -686,29 +485,15 @@ async function loadProjects(context, baseUrl, token, treeDataProvider) {
             });
 
             const projects = response.data;
-
             await context.globalState.update('taiga_projects', projects);
-
-            // Rafraîchir la vue
-            treeDataProvider.refresh();
+            projectsProvider.refresh();
 
             vscode.window.showInformationMessage(
                 `${projects.length} projet(s) chargé(s) avec succès !`
             );
-
-            console.log('Projets Taiga:', projects.map(p => ({ name: p.name, slug: p.slug })));
         });
     } catch (err) {
         console.error('Erreur lors du chargement des projets:', err);
         vscode.window.showErrorMessage('Impossible de charger les projets');
     }
 }
-
-function deactivate() {
-    console.log('Extension Taiga désactivée');
-}
-
-module.exports = {
-    activate,
-    deactivate
-};
