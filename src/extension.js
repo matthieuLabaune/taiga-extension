@@ -30,8 +30,14 @@ class TaigaTreeDataProvider {
             // Niveau racine - afficher les projets
             return await this.getProjects();
         } else if (element.contextValue === 'project') {
-            // Niveau projet - afficher sprints et user stories
+            // Niveau projet - afficher epics, sprints et user stories
             return await this.getProjectChildren(element.data);
+        } else if (element.contextValue === 'epics-section') {
+            // Section epics - afficher tous les epics
+            return await this.getProjectEpics(element.projectId);
+        } else if (element.contextValue === 'epic') {
+            // Niveau epic - afficher les user stories de l'epic
+            return await this.getEpicUserStories(element.data);
         } else if (element.contextValue === 'sprints-section') {
             // Section sprints - afficher tous les sprints
             return await this.getProjectSprints(element.projectId);
@@ -68,6 +74,12 @@ class TaigaTreeDataProvider {
     async getProjectChildren(project) {
         const children = [];
 
+        // Section Epics
+        const epicsItem = new vscode.TreeItem('📋 Epics', vscode.TreeItemCollapsibleState.Collapsed);
+        epicsItem.contextValue = 'epics-section';
+        epicsItem.projectId = project.id;
+        children.push(epicsItem);
+
         // Section Sprints (Milestones)
         const sprintsItem = new vscode.TreeItem('🏃 Sprints', vscode.TreeItemCollapsibleState.Collapsed);
         sprintsItem.contextValue = 'sprints-section';
@@ -88,6 +100,16 @@ class TaigaTreeDataProvider {
             }
         } catch (error) {
             console.error('Erreur chargement sprints:', error);
+        }
+
+        // Charger les epics et compter
+        try {
+            const epics = await this.loadEpics(project.id);
+            if (epics.length > 0) {
+                epicsItem.description = `(${epics.length})`;
+            }
+        } catch (error) {
+            console.error('Erreur chargement epics:', error);
         }
 
         return children;
@@ -178,6 +200,76 @@ class TaigaTreeDataProvider {
         } catch (error) {
             console.error('Erreur API tasks:', error);
             return [];
+        }
+    }
+
+    async loadEpics(projectId) {
+        const token = this.context.globalState.get('taiga_auth_token');
+        const config = vscode.workspace.getConfiguration('taiga');
+        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
+
+        try {
+            const response = await axios.get(`${baseUrl}/api/v1/epics?project=${projectId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Erreur API epics:', error);
+            return [];
+        }
+    }
+
+    async getProjectEpics(projectId) {
+        try {
+            const epics = await this.loadEpics(projectId);
+            if (epics.length === 0) {
+                return [this.createInfoItem('Aucun epic trouvé')];
+            }
+
+            return epics.map(epic => {
+                const statusIcon = epic.is_closed ? '✅' : '📋';
+                const item = new vscode.TreeItem(
+                    `${statusIcon} #${epic.ref} ${epic.subject}`,
+                    vscode.TreeItemCollapsibleState.Collapsed
+                );
+
+                item.tooltip = `Epic #${epic.ref}: ${epic.subject}\nStatut: ${epic.status_extra_info?.name || 'N/A'}`;
+                item.contextValue = 'epic';
+                item.data = epic;
+                item.iconPath = new vscode.ThemeIcon(epic.is_closed ? 'check' : 'bookmark');
+
+                // Ajouter la description avec le statut
+                if (epic.status_extra_info?.name) {
+                    item.description = `*(${epic.status_extra_info.name})*`;
+                }
+
+                return item;
+            });
+        } catch (error) {
+            console.error('Erreur chargement epics:', error);
+            return [this.createInfoItem('Erreur lors du chargement des epics')];
+        }
+    }
+
+    async getEpicUserStories(epic) {
+        const token = this.context.globalState.get('taiga_auth_token');
+        const config = vscode.workspace.getConfiguration('taiga');
+        const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
+
+        try {
+            const response = await axios.get(`${baseUrl}/api/v1/userstories?project=${epic.project}&epic=${epic.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const userStories = response.data;
+            
+            if (userStories.length === 0) {
+                return [this.createInfoItem('Aucune user story dans cet epic')];
+            }
+            
+            return userStories.map(us => this.createUserStoryItem(us));
+        } catch (error) {
+            console.error('Erreur API user stories epic:', error);
+            return [this.createInfoItem('Erreur lors du chargement des user stories')];
         }
     }
 
@@ -410,6 +502,15 @@ function activate(context) {
         }
     });
 
+    const openEpicCommand = vscode.commands.registerCommand('taiga.openEpic', (item) => {
+        if (item && item.data) {
+            const config = vscode.workspace.getConfiguration('taiga');
+            const baseUrl = config.get('baseUrl', 'https://taiga.handisport.org');
+            const url = `${baseUrl}/project/${item.data.project_extra_info?.slug}/epic/${item.data.ref}`;
+            vscode.env.openExternal(vscode.Uri.parse(url));
+        }
+    });
+
     context.subscriptions.push(
         loginCommand,
         refreshCommand,
@@ -417,7 +518,8 @@ function activate(context) {
         openProjectCommand,
         openUserStoryCommand,
         openTaskCommand,
-        openMilestoneCommand
+        openMilestoneCommand,
+        openEpicCommand
     );
 }
 

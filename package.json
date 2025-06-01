@@ -71,6 +71,11 @@
                 "command": "taiga.openMilestone",
                 "title": "Ouvrir le milestone",
                 "icon": "$(link-external)"
+            },
+            {
+                "command": "taiga.openEpic",
+                "title": "Ouvrir l'epic",
+                "icon": "$(link-external)"
             }
         ],
         "menus": {
@@ -110,6 +115,11 @@
                 {
                     "command": "taiga.openMilestone",
                     "when": "view == taigaExplorer && viewItem == milestone",
+                    "group": "inline"
+                },
+                {
+                    "command": "taiga.openEpic",
+                    "when": "view == taigaExplorer && viewItem == epic",
                     "group": "inline"
                 }
             ]
