@@ -75,21 +75,24 @@ class TaigaTreeDataProvider {
         const children = [];
 
         // Section Epics
-        const epicsItem = new vscode.TreeItem('📋 Epics', vscode.TreeItemCollapsibleState.Collapsed);
+        const epicsItem = new vscode.TreeItem('Epics', vscode.TreeItemCollapsibleState.Collapsed);
         epicsItem.contextValue = 'epics-section';
         epicsItem.projectId = project.id;
+        epicsItem.iconPath = new vscode.ThemeIcon('bookmark');
         children.push(epicsItem);
 
         // Section Sprints (Milestones)
-        const sprintsItem = new vscode.TreeItem('🏃 Sprints', vscode.TreeItemCollapsibleState.Collapsed);
+        const sprintsItem = new vscode.TreeItem('Sprints', vscode.TreeItemCollapsibleState.Collapsed);
         sprintsItem.contextValue = 'sprints-section';
         sprintsItem.projectId = project.id;
+        sprintsItem.iconPath = new vscode.ThemeIcon('clock');
         children.push(sprintsItem);
 
         // Section User Stories
-        const userStoriesItem = new vscode.TreeItem('📝 User Stories', vscode.TreeItemCollapsibleState.Collapsed);
+        const userStoriesItem = new vscode.TreeItem('User Stories', vscode.TreeItemCollapsibleState.Collapsed);
         userStoriesItem.contextValue = 'userstories-section';
         userStoriesItem.projectId = project.id;
+        userStoriesItem.iconPath = new vscode.ThemeIcon('list-unordered');
         children.push(userStoriesItem);
 
         // Charger les sprints et compter
@@ -123,9 +126,8 @@ class TaigaTreeDataProvider {
             }
 
             return milestones.map(milestone => {
-                const statusIcon = milestone.closed ? '✅' : '🏃';
                 const item = new vscode.TreeItem(
-                    `${statusIcon} ${milestone.name}`,
+                    milestone.name,
                     vscode.TreeItemCollapsibleState.Collapsed
                 );
 
@@ -227,9 +229,8 @@ class TaigaTreeDataProvider {
             }
 
             return epics.map(epic => {
-                const statusIcon = epic.is_closed ? '✅' : '📋';
                 const item = new vscode.TreeItem(
-                    `${statusIcon} #${epic.ref} ${epic.subject}`,
+                    `#${epic.ref} ${epic.subject}`,
                     vscode.TreeItemCollapsibleState.Collapsed
                 );
 
@@ -261,11 +262,11 @@ class TaigaTreeDataProvider {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const userStories = response.data;
-            
+
             if (userStories.length === 0) {
                 return [this.createInfoItem('Aucune user story dans cet epic')];
             }
-            
+
             return userStories.map(us => this.createUserStoryItem(us));
         } catch (error) {
             console.error('Erreur API user stories epic:', error);
@@ -284,10 +285,8 @@ class TaigaTreeDataProvider {
     }
 
     createUserStoryItem(userStory) {
-        const statusIcon = userStory.is_closed ? '✅' : '🔄';
-
         // Construire le titre avec truncature si nécessaire
-        let title = `${statusIcon} #${userStory.ref} ${userStory.subject}`;
+        let title = `#${userStory.ref} ${userStory.subject}`;
         if (title.length > 60) {
             title = title.substring(0, 57) + '...';
         }
@@ -312,7 +311,7 @@ class TaigaTreeDataProvider {
         item.tooltip = `#${userStory.ref}: ${userStory.subject}\nStatut: ${userStory.status_extra_info?.name || 'N/A'}\nAssigné à: ${userStory.assigned_to_extra_info?.full_name_display || 'Non assigné'}`;
         item.contextValue = 'userstory';
         item.data = userStory;
-        item.iconPath = new vscode.ThemeIcon('book');
+        item.iconPath = new vscode.ThemeIcon(userStory.is_closed ? 'check' : 'circle-outline');
         return item;
     }
 
@@ -323,10 +322,8 @@ class TaigaTreeDataProvider {
         }
 
         return tasks.map(task => {
-            const statusIcon = task.is_closed ? '✅' : '🔲';
-
             // Construire le titre avec truncature si nécessaire
-            let title = `${statusIcon} #${task.ref} ${task.subject}`;
+            let title = `#${task.ref} ${task.subject}`;
             if (title.length > 60) {
                 title = title.substring(0, 57) + '...';
             }
