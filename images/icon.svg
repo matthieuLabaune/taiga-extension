@@ -1,0 +1,19 @@
+<!-- filepath: /Users/matt/Documents/sites/taiga-extension/images/icon.svg -->
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cercle de fond -->
+  <circle cx="64" cy="64" r="60" fill="#2c3e50" stroke="#34495e" stroke-width="4"/>
+
+  <!-- Lettre T stylisée -->
+  <rect x="44" y="32" width="40" height="8" fill="#3498db" rx="2"/>
+  <rect x="60" y="32" width="8" height="64" fill="#3498db" rx="2"/>
+
+  <!-- Points décoratifs (style kanban) -->
+  <circle cx="28" cy="48" r="4" fill="#e74c3c"/>
+  <circle cx="28" cy="64" r="4" fill="#f39c12"/>
+  <circle cx="28" cy="80" r="4" fill="#27ae60"/>
+
+  <!-- Lignes de connection -->
+  <line x1="36" y1="48" x2="44" y2="48" stroke="#95a5a6" stroke-width="2"/>
+  <line x1="36" y1="64" x2="44" y2="64" stroke="#95a5a6" stroke-width="2"/>
+  <line x1="36" y1="80" x2="44" y2="80" stroke="#95a5a6" stroke-width="2"/>
+</svg>

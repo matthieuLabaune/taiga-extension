@@ -12,6 +12,11 @@
     ],
     "activationEvents": [],
     "main": "./src/extension.js",
+    "icon": "images/icon.svg",
+    "galleryBanner": {
+        "color": "#2c3e50",
+        "theme": "dark"
+    },
     "contributes": {
         "views": {
             "taigaView": [
