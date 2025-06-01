@@ -1,0 +1,142 @@
+{
+    "name": "taiga-extension",
+    "displayName": "Taiga Project Manager",
+    "description": "Extension VS Code pour gérer vos projets Taiga",
+    "version": "0.0.1",
+    "publisher": "matthieulabaune",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./src/extension.js",
+    "contributes": {
+        "views": {
+            "taigaView": [
+                {
+                    "id": "taigaExplorer",
+                    "name": "Projets",
+                    "when": "true"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "taigaView",
+                    "title": "Taiga",
+                    "icon": "$(project)"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "taiga.login",
+                "title": "Se connecter",
+                "icon": "$(sign-in)"
+            },
+            {
+                "command": "taiga.refresh",
+                "title": "Actualiser",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "taiga.logout",
+                "title": "Se déconnecter",
+                "icon": "$(sign-out)"
+            },
+            {
+                "command": "taiga.openProject",
+                "title": "Ouvrir le projet",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "taiga.openUserStory",
+                "title": "Ouvrir la user story",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "taiga.openTask",
+                "title": "Ouvrir la tâche",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "taiga.openMilestone",
+                "title": "Ouvrir le milestone",
+                "icon": "$(link-external)"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "taiga.login",
+                    "when": "view == taigaExplorer",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "taiga.refresh",
+                    "when": "view == taigaExplorer",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "taiga.logout",
+                    "when": "view == taigaExplorer",
+                    "group": "navigation@3"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "taiga.openProject",
+                    "when": "view == taigaExplorer && viewItem == project",
+                    "group": "inline"
+                },
+                {
+                    "command": "taiga.openUserStory",
+                    "when": "view == taigaExplorer && viewItem == userstory",
+                    "group": "inline"
+                },
+                {
+                    "command": "taiga.openTask",
+                    "when": "view == taigaExplorer && viewItem == task",
+                    "group": "inline"
+                },
+                {
+                    "command": "taiga.openMilestone",
+                    "when": "view == taigaExplorer && viewItem == milestone",
+                    "group": "inline"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Taiga",
+            "properties": {
+                "taiga.baseUrl": {
+                    "type": "string",
+                    "default": "https://taiga.handisport.org",
+                    "description": "URL de base de votre serveur Taiga"
+                },
+                "taiga.username": {
+                    "type": "string",
+                    "description": "Nom d'utilisateur Taiga"
+                },
+                "taiga.password": {
+                    "type": "string",
+                    "description": "Mot de passe Taiga (stocké en configuration - non sécurisé)"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "install-node": "echo 'Please install Node.js from https://nodejs.org'",
+        "vscode:prepublish": "echo 'No compilation needed - using JavaScript'",
+        "compile": "echo 'No TypeScript compilation'",
+        "watch": "echo 'No watch mode needed'"
+    },
+    "dependencies": {
+        "@types/node-fetch": "^2.6.4",
+        "axios": "^1.9.0",
+        "node-fetch": "^2.6.12"
+    }
+}

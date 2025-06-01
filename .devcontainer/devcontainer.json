@@ -1,0 +1,21 @@
+{
+    "name": "Taiga Extension Development - Simple",
+    "image": "mcr.microsoft.com/vscode/devcontainers/base:alpine",
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "18"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.vscode-typescript-next"
+            ]
+        }
+    },
+    "postCreateCommand": "npm install || echo 'npm install failed'",
+    "remoteUser": "vscode",
+    "mounts": [],
+    "containerEnv": {},
+    "updateContentCommand": "echo 'Container ready'"
+}
