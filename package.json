@@ -76,24 +76,44 @@
                 "command": "taiga.openEpic",
                 "title": "Ouvrir l'epic",
                 "icon": "$(link-external)"
+            },
+            {
+                "command": "taiga.search",
+                "title": "Rechercher",
+                "icon": "$(search)"
+            },
+            {
+                "command": "taiga.clearSearch",
+                "title": "Effacer la recherche",
+                "icon": "$(clear-all)"
             }
         ],
         "menus": {
             "view/title": [
                 {
-                    "command": "taiga.login",
+                    "command": "taiga.search",
                     "when": "view == taigaExplorer",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "taiga.refresh",
+                    "command": "taiga.clearSearch",
                     "when": "view == taigaExplorer",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "taiga.logout",
+                    "command": "taiga.login",
                     "when": "view == taigaExplorer",
                     "group": "navigation@3"
+                },
+                {
+                    "command": "taiga.refresh",
+                    "when": "view == taigaExplorer",
+                    "group": "navigation@4"
+                },
+                {
+                    "command": "taiga.logout",
+                    "when": "view == taigaExplorer",
+                    "group": "navigation@5"
                 }
             ],
             "view/item/context": [
